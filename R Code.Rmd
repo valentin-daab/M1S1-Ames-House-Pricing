@@ -1,0 +1,210 @@
+---
+title: "R Code"
+author: "DAAB Valentin"
+date: "08/02/2022"
+output: github_document
+---
+
+## Librairies utilisées
+
+```{r, message = F, warning = F}
+library(openintro)
+library(corrplot)
+library(dplyr)
+library(ggplot2)
+library(caret)
+library(stargazer)
+library(lmtest)
+library(stats)
+library(sandwich)
+library(DataExplorer)
+library(car)
+library(ggfortify)
+library(EnvStats)
+library(measurements)
+```
+
+## Importation des données
+
+```{r}
+data(ames)
+data <- as.data.frame(ames)
+head(data)
+```
+
+## Graphique des données manquantes
+
+```{r}
+plot_missing(data, missing_only = T)
+```
+
+
+Certaines données sont manquantes mais dans le cadre de la variable Pool par exemple, 'NA' signifie qu'il n'y a pas de piscine.
+Il faut alors modifier la variable.
+
+
+## Changement des variables catégorielles (pas encore abordées en cours) en variables binaires
+
+```{r}
+data <- data %>% mutate(Pool.QC = ifelse(is.na(Pool.QC), 0, 1))
+data <- data %>% mutate(Central.Air = ifelse(Central.Air == "Y", 1, 0))
+data <- data %>% mutate(Mas.Vnr.Type = ifelse(Mas.Vnr.Type == "None", 0, 1))
+data <- data %>% mutate(Fireplaces = ifelse(Fireplaces == "0", 0, 1))
+```
+
+## Graphiques de visualisation des données
+
+```{r}
+ggplot(data = data, aes(x = price, y = area, color = Central.Air)) + 
+  geom_point()
+
+ggplot(data = data, aes(x = price, y = area, color = Pool.QC)) + 
+  geom_point()
+
+ggplot(data = data, aes(x = price, y = area, color = Mas.Vnr.Type)) + 
+  geom_point()
+
+ggplot(data = data, aes(x = price, y = area, color = Street)) + 
+  geom_point()
+
+ggplot(data = data, aes(x = price, y = area, color = Fireplaces)) + 
+  geom_point()
+```
+
+On peut constater que les maisons possédant une climatisation ou une façade en brique (Mas.Vnr.Type) sont plus coûteuses.
+Pour reprendre l'exemple des piscines (Pool.QC), il n'y a pas assez d'habitations qui en possèdent, la variable ne sera donc pas significative. Idem pour la variable Street.
+
+
+
+
+## Création d'un data frame avec les variables sélectionnées
+
+```{r}
+xxx <- data %>%
+  select(area, price, Lot.Area, Total.Bsmt.SF, Garage.Area, Mas.Vnr.Area, Mas.Vnr.Type, Central.Air, Fireplaces) 
+```
+
+Variables sélectionnées :
+
+- Area : Surface habitable (en square feet)
+- Price : Prix (en dollars)
+- Lot.Area : Surface du terrain (en sq ft)
+- Total.Bsmt.SF : Surface de la cave (en sq ft)
+- Garage.Area : Surface du garage (en sq ft)
+- Mas.Vnr.Area : Surface de la façade en briques (en sq ft)
+- Mas.Vnr.Type : Façade en brique ou pas
+- Central.Air : Climatisation ou pas
+- Fireplaces : Cheminée ou pas
+
+
+
+
+
+## Statistiques Descriptives
+
+```{r}
+stargazer(xxx, 
+          type = "text",
+          title = "Statistiques Descriptives des variables sélectionnées")
+```
+
+Quelques interprétations :
+
+- La surface habitable moyenne est d'environ 1500 square feet (140m²)
+- Le prix moyen est de 180 796 dollars
+- 93\% des maisons possèdent une climatisation
+- 51\% des maisons possèdent une cheminée
+
+
+
+## Régression selon les MCO + Graphique
+
+```{r}
+lm1 = lm(price ~ area, data = ames)
+summary(lm1)
+
+ggplot(ames, aes(x = area, y = price)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, size = 1) +
+  labs(x = "Surface en square feet", 
+        y = "Prix en dollars",
+        title = "Regression simple")
+
+```
+
+Interprétation :
+
+- Une hausse de la surface de 10 sq ft, augmente le prix de vente de la maison de 1116.94 dollars, toutes choses égales par ailleurs.
+
+
+
+
+
+
+## Test de Breusch-Pagan (indique la présence d'hétéroscédasticité)
+
+```{r}
+bptest(lm1)
+```
+
+Ici, la p-value est inférieure au seuil de significativité, il y a donc présence d'hétéroscédasticité. Le graphique précédent le confirme.
+
+
+## Utiliser l'écart type robuste va nous permettre d'interpréter correctement.
+
+```{r}
+coeftest(lm1, vcov = vcovHC(lm1, type = "HC0"))
+```
+
+La variable Area reste significative.
+
+
+## Régression multiple avec toutes les variables sélectionnées + Test de Breusch-Pagan + Ecarts type robustes
+
+```{r}
+lm.fit <- lm(price ~ area
+             + Lot.Area
+             + Total.Bsmt.SF
+             + Garage.Area
+             + Mas.Vnr.Type
+             + Mas.Vnr.Area
+             + Central.Air
+             + Fireplaces
+             , data = data )  
+
+summary(lm.fit)
+
+bptest(lm.fit)
+
+coeftest(lm.fit, vcov = vcovHC(lm.fit, type = "HC0"))
+```
+
+
+Quelques interprétations après avoir corrigé l'hétéroscédasticité:
+
+- Les variables que sont la surface du terrain et la présence d'une façade en briques ou non ne sont pas significatives.
+- La présence d'une climatisation augmente le prix de 19 597 dollars (toutes choses égales par ailleurs).
+- La présence d'une cheminée augmente le prix de 18 792 dollars.
+- 1 square feet de garage en plus, augmente le prix de 87 dollars environ.
+- Ici, 1 square feet de surface habitable en plus, augmente le prix de 58 dollars environ.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
