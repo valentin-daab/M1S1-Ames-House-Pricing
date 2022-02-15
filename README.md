@@ -3,3 +3,6 @@
 
 ## Full Code and Interpretations
 [CODE](R-Code.md)
+
+## Data Used
+[DATA](https://vincentarelbundock.github.io/Rdatasets/doc/openintro/ames.html)
